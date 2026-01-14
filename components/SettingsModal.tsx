@@ -3,19 +3,18 @@ import React, { useState, useEffect } from 'react';
 
 interface SettingsModalProps {
   onClose: () => void;
-  onGeminiKeyRequested: () => Promise<void>;
-  hasGeminiKey: boolean;
 }
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onGeminiKeyRequested, hasGeminiKey }) => {
+const SettingsModal: React.FC<SettingsModalProps> = ({ onClose }) => {
   const [ytKey, setYtKey] = useState('');
+  const [geminiKey, setGeminiKey] = useState('');
 
   useEffect(() => {
-    const savedKey = localStorage.getItem('YT_API_KEY') || '';
-    setYtKey(savedKey);
+    setYtKey(localStorage.getItem('YT_API_KEY') || '');
+    setGeminiKey(localStorage.getItem('GEMINI_API_KEY') || '');
   }, []);
 
-  const handleSave = () => {
+  const handleSaveYT = () => {
     if (!ytKey.trim()) {
       alert('YouTube API 키를 입력해주세요.');
       return;
@@ -25,68 +24,76 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onGeminiKeyReque
     alert('YouTube API 설정이 저장되었습니다.');
   };
 
+  const handleSaveGemini = () => {
+    if (!geminiKey.trim()) {
+      alert('Gemini API 키를 입력해주세요.');
+      return;
+    }
+    localStorage.setItem('GEMINI_API_KEY', geminiKey);
+    window.dispatchEvent(new Event('storage'));
+    alert('Gemini API 설정이 저장되었습니다.');
+  };
+
+  const isYouTubeSet = ytKey.trim() !== '';
+  const isGeminiSet = geminiKey.trim() !== '';
+  const isAllSet = isYouTubeSet && isGeminiSet;
+
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-300">
-      <div className="bg-slate-900 border border-slate-800 rounded-[2.5rem] w-full max-w-lg p-10 shadow-2xl overflow-hidden relative">
+      <div className="bg-slate-900 border border-slate-800 rounded-[3rem] w-full max-w-lg p-10 shadow-2xl overflow-hidden relative">
         <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-rose-600 to-rose-400"></div>
         
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h3 className="text-xl font-black text-white">서비스 시작하기</h3>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">API Integration Center</p>
+        <div className="flex justify-between items-center mb-10">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-black text-white tracking-tight">서비스 시작하기</h3>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-[0.2em]">API Integration Center</p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-500 hover:text-white">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+          <button onClick={onClose} className="p-3 hover:bg-slate-800 rounded-2xl transition-all text-slate-500 hover:text-white">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <div className="space-y-10">
-          {/* Gemini Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest">1. Gemini AI Project Key (필수)</label>
-              {hasGeminiKey && <span className="text-[10px] font-black text-emerald-500">연결됨 ✓</span>}
+        <div className="space-y-12">
+          {/* 1. Gemini AI Section */}
+          <div className="space-y-5">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[11px] font-black text-rose-500 uppercase tracking-widest">1. Gemini API Key</label>
+              {isGeminiSet && <span className="text-[10px] font-black text-emerald-500">저장됨 ✓</span>}
             </div>
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-5 space-y-4">
-              <p className="text-[11px] text-slate-400 leading-relaxed font-medium">
-                Gemini API 키는 보안 인증 및 결제 프로필 확인을 위해 **'프로젝트 선택'** 방식만 지원합니다. 텍스트 직접 입력 방식은 보안상의 이유로 제한되어 있습니다.
-              </p>
+            <div className="space-y-3">
+              <input 
+                type="password"
+                value={geminiKey}
+                onChange={(e) => setGeminiKey(e.target.value)}
+                placeholder="Gemini API 키를 입력하세요"
+                className="w-full bg-slate-950 border border-slate-800 rounded-[1.5rem] px-6 py-5 text-sm text-slate-200 outline-none focus:border-rose-500/50 transition-all placeholder:text-slate-700 shadow-inner"
+              />
               <button 
-                onClick={onGeminiKeyRequested}
-                className={`w-full py-4 rounded-xl font-black transition-all flex items-center justify-center gap-3 border ${
-                  hasGeminiKey 
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
-                  : 'bg-rose-600 text-white border-rose-500 shadow-xl shadow-rose-900/20 active:scale-95'
-                }`}
+                onClick={handleSaveGemini}
+                className="w-full py-4 bg-slate-800 text-rose-500 rounded-[1.5rem] font-black hover:bg-rose-600 hover:text-white transition-all active:scale-95 text-xs border border-slate-700/50 shadow-lg"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                {hasGeminiKey ? '연결된 프로젝트 변경' : 'AI 프로젝트 키 선택'}
+                Gemini 키 저장
               </button>
-              <p className="text-[9px] text-slate-500 font-medium italic">
-                * 유료 결제가 설정된 구글 클라우드 프로젝트를 선택해야 모든 기능을 정상적으로 사용할 수 있습니다.
-              </p>
             </div>
           </div>
 
-          <div className="w-full h-px bg-slate-800"></div>
-
-          {/* YouTube Section */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest">2. YouTube Data API v3 Key</label>
-              {ytKey && <span className="text-[10px] font-black text-emerald-500">저장됨 ✓</span>}
+          {/* 2. YouTube Section */}
+          <div className="space-y-5">
+            <div className="flex items-center justify-between px-1">
+              <label className="text-[11px] font-black text-blue-500 uppercase tracking-widest">2. YouTube Data API v3 Key</label>
+              {isYouTubeSet && <span className="text-[10px] font-black text-emerald-500">저장됨 ✓</span>}
             </div>
             <div className="space-y-3">
               <input 
                 type="password"
                 value={ytKey}
                 onChange={(e) => setYtKey(e.target.value)}
-                placeholder="YouTube API 키를 직접 입력하세요"
-                className="w-full bg-slate-950 border border-slate-800 rounded-2xl px-5 py-4 text-sm text-slate-200 outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700"
+                placeholder="YouTube API 키를 입력하세요"
+                className="w-full bg-slate-950 border border-slate-800 rounded-[1.5rem] px-6 py-5 text-sm text-slate-200 outline-none focus:border-blue-500/50 transition-all placeholder:text-slate-700 shadow-inner"
               />
               <button 
-                onClick={handleSave}
-                className="w-full py-3 bg-slate-800 text-white rounded-xl font-black hover:bg-slate-700 transition-all active:scale-95 text-xs"
+                onClick={handleSaveYT}
+                className="w-full py-4 bg-slate-800 text-blue-500 rounded-[1.5rem] font-black hover:bg-blue-600 hover:text-white transition-all active:scale-95 text-xs border border-slate-700/50 shadow-lg"
               >
                 YouTube 키 저장
               </button>
@@ -94,16 +101,22 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ onClose, onGeminiKeyReque
           </div>
         </div>
 
-        {hasGeminiKey && ytKey && (
-          <div className="mt-10 animate-in fade-in slide-in-from-top-2 duration-500">
+        {isAllSet && (
+          <div className="mt-12 animate-in fade-in slide-in-from-top-4 duration-500">
              <button 
               onClick={onClose}
-              className="w-full py-5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-2xl font-black hover:from-emerald-500 hover:to-teal-500 transition-all shadow-2xl shadow-emerald-900/40"
+              className="w-full py-6 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-[2rem] font-black hover:from-emerald-500 hover:to-teal-500 transition-all shadow-2xl shadow-emerald-900/40 text-lg border-t border-emerald-400/20"
             >
-              아이디어 구상 시작
+              제작 스튜디오 입장
             </button>
           </div>
         )}
+
+        <div className="mt-8 flex justify-center">
+          <p className="text-[10px] text-slate-600 font-medium">
+            모든 API 키는 브라우저 로컬 스토리지에만 안전하게 저장됩니다.
+          </p>
+        </div>
       </div>
     </div>
   );
