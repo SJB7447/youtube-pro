@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { generateConceptAngles, analyzeConceptBrief, generateScriptOutline } from './services/geminiService';
 import { searchVideos, hasYouTubeKey } from './services/youtubeService';
 import { AIConcept, AnalysisResult, ScriptOutline, FavoriteProject, YouTubeVideo } from './types';
@@ -15,10 +15,13 @@ const LANGUAGES = [
   { id: 'Chinese', label: '中文 (CN)' }
 ];
 
+type SortCriteria = 'efficiency' | 'views' | 'subscribers' | 'likes' | 'comments';
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'discover' | 'ideate'>('discover');
   const [searchQuery, setSearchQuery] = useState('');
   const [videoType, setVideoType] = useState<'any' | 'short' | 'long'>('any');
+  const [sortBy, setSortBy] = useState<SortCriteria>('efficiency');
   const [searchResults, setSearchResults] = useState<YouTubeVideo[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
 
@@ -75,13 +78,26 @@ const App: React.FC = () => {
     setSearchLoading(true);
     try {
       const results = await searchVideos(searchQuery, videoType);
-      setSearchResults(results.sort((a, b) => b.efficiencyRatio - a.efficiencyRatio));
+      setSearchResults(results);
     } catch (err: any) {
       alert(err.message);
     } finally {
       setSearchLoading(false);
     }
   };
+
+  const sortedResults = useMemo(() => {
+    return [...searchResults].sort((a, b) => {
+      switch (sortBy) {
+        case 'views': return b.viewCount - a.viewCount;
+        case 'subscribers': return b.subscriberCount - a.subscriberCount;
+        case 'likes': return (b.likeCount || 0) - (a.likeCount || 0);
+        case 'comments': return (b.commentCount || 0) - (a.commentCount || 0);
+        case 'efficiency':
+        default: return b.efficiencyRatio - a.efficiencyRatio;
+      }
+    });
+  }, [searchResults, sortBy]);
 
   const handleGenerateConcepts = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,8 +197,8 @@ const App: React.FC = () => {
 
           <div className="w-full max-w-2xl">
             {activeTab === 'discover' ? (
-              <form onSubmit={handleSearch} className="flex flex-col gap-4">
-                <div className="flex gap-2">
+              <div className="flex flex-col gap-4">
+                <form onSubmit={handleSearch} className="flex gap-2">
                   <input 
                     type="text"
                     value={searchQuery}
@@ -193,19 +209,39 @@ const App: React.FC = () => {
                   <button type="submit" disabled={searchLoading} className="bg-rose-600 text-white px-8 py-4 rounded-2xl font-black hover:bg-rose-500 disabled:opacity-50 transition-all text-sm shadow-xl active:scale-95 whitespace-nowrap">
                     {searchLoading ? '검색 중...' : '소재 발굴'}
                   </button>
+                </form>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-full">
+                    {['any', 'short', 'long'].map((type) => (
+                      <button 
+                        key={type}
+                        onClick={() => setVideoType(type as any)}
+                        className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all ${videoType === type ? 'bg-slate-100 text-slate-900' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        {type === 'any' ? '전체' : type === 'short' ? '쇼츠' : '롱폼'}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="h-4 w-px bg-slate-800"></div>
+                  <div className="flex bg-slate-900 border border-slate-800 p-1 rounded-full">
+                    {[
+                      { id: 'efficiency', label: '효율순' },
+                      { id: 'views', label: '조회순' },
+                      { id: 'subscribers', label: '구독순' },
+                      { id: 'likes', label: '좋아요순' },
+                      { id: 'comments', label: '댓글순' }
+                    ].map((crit) => (
+                      <button 
+                        key={crit.id}
+                        onClick={() => setSortBy(crit.id as SortCriteria)}
+                        className={`px-3 py-1.5 rounded-full text-[9px] font-black transition-all ${sortBy === crit.id ? 'bg-rose-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                      >
+                        {crit.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex justify-center gap-2">
-                  {['any', 'short', 'long'].map((type) => (
-                    <button 
-                      key={type}
-                      onClick={() => setVideoType(type as any)}
-                      className={`px-4 py-1.5 rounded-full text-[10px] font-black border transition-all ${videoType === type ? 'bg-slate-100 text-slate-900 border-white' : 'text-slate-500 border-slate-800 hover:border-slate-600'}`}
-                    >
-                      {type === 'any' ? '전체' : type === 'short' ? '쇼츠' : '롱폼'}
-                    </button>
-                  ))}
-                </div>
-              </form>
+              </div>
             ) : (
               <form onSubmit={handleGenerateConcepts} className="flex flex-col gap-4">
                 <div className="flex gap-2">
@@ -240,15 +276,20 @@ const App: React.FC = () => {
       <main className="max-w-7xl mx-auto px-6 mt-16">
         {activeTab === 'discover' ? (
           <div className="space-y-12">
-            {searchResults.length > 0 ? (
+            {sortedResults.length > 0 ? (
               <>
                 <div className="flex flex-col items-center text-center max-w-2xl mx-auto mb-12">
                   <span className="text-emerald-500 font-black text-[10px] tracking-widest uppercase mb-4">Viral Market Analysis</span>
                   <h2 className="text-4xl font-black tracking-tight mb-4">"{searchQuery}" 검색 결과</h2>
-                  <p className="text-slate-500 text-sm leading-relaxed">구독자 대비 조회수(효율성)가 높은 영상을 분석하여 나만의 소재로 만드세요.</p>
+                  <p className="text-slate-500 text-sm leading-relaxed">
+                    {sortBy === 'efficiency' ? '구독자 대비 조회수(효율성)' : 
+                     sortBy === 'views' ? '조회수' : 
+                     sortBy === 'subscribers' ? '구독자수' : 
+                     sortBy === 'likes' ? '좋아요수' : '댓글수'}가 높은 순으로 정렬되었습니다.
+                  </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {searchResults.map(video => (
+                  {sortedResults.map(video => (
                     <VideoCard 
                       key={video.id} 
                       video={video} 

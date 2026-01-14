@@ -56,15 +56,19 @@ export const searchVideos = async (
 
     const statsMap = new Map();
     (statsData.items || []).forEach((v: any) => {
-      statsMap.set(v.id, parseInt(v.statistics.viewCount) || 0);
+      statsMap.set(v.id, {
+        viewCount: parseInt(v.statistics.viewCount) || 0,
+        likeCount: parseInt(v.statistics.likeCount) || 0,
+        commentCount: parseInt(v.statistics.commentCount) || 0
+      });
     });
 
     return items.map((item: any): YouTubeVideo => {
       const vId = item.id.videoId;
       const cId = item.snippet.channelId;
-      const viewCount = statsMap.get(vId) || 0;
+      const stats = statsMap.get(vId) || { viewCount: 0, likeCount: 0, commentCount: 0 };
       const subCount = channelMap.get(cId) || 0;
-      const efficiencyRatio = subCount > 0 ? (viewCount / subCount) * 100 : 0;
+      const efficiencyRatio = subCount > 0 ? (stats.viewCount / subCount) * 100 : 0;
 
       return {
         id: vId,
@@ -73,9 +77,11 @@ export const searchVideos = async (
         publishedAt: item.snippet.publishedAt,
         channelTitle: item.snippet.channelTitle,
         channelId: cId,
-        viewCount,
+        viewCount: stats.viewCount,
         subscriberCount: subCount,
-        efficiencyRatio
+        efficiencyRatio,
+        likeCount: stats.likeCount,
+        commentCount: stats.commentCount
       };
     });
   } catch (error: any) {

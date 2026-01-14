@@ -76,6 +76,8 @@ export interface YouTubeVideo {
   viewCount: number;
   subscriberCount: number;
   efficiencyRatio: number;
+  likeCount?: number;
+  commentCount?: number;
 }
 
 export interface FavoriteProject {
