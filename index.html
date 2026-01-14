@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>YouTube Content Ideator Pro</title>
+    <title>Ideator Pro - AI Concept Studio</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,11 +18,15 @@
             background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255, 255, 255, 0.1);
             border-radius: 10px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: rgba(255,255,255,0.2);
+            background: rgba(255, 255, 255, 0.2);
+        }
+        /* Custom styles for dark mode accents */
+        input:focus {
+            box-shadow: 0 0 0 4px rgba(225, 29, 72, 0.15);
         }
     </style>
 <script type="importmap">
@@ -37,7 +41,7 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-950 text-slate-50 selection:bg-rose-500/30 selection:text-rose-200">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
 </body>

@@ -2,7 +2,11 @@
 import { YouTubeVideo, CommentData } from '../types';
 
 export const getYouTubeApiKey = () => {
-  return localStorage.getItem('YT_API_KEY') || process.env.API_KEY || '';
+  return localStorage.getItem('YT_API_KEY') || '';
+};
+
+export const hasYouTubeKey = () => {
+  return !!getYouTubeApiKey();
 };
 
 export const searchVideos = async (
@@ -10,9 +14,10 @@ export const searchVideos = async (
   videoType: 'any' | 'short' | 'long' = 'any'
 ): Promise<YouTubeVideo[]> => {
   const apiKey = getYouTubeApiKey();
-  if (!apiKey) throw new Error("YouTube API 키가 설정되지 않았습니다. 설정에서 입력해주세요.");
+  if (!apiKey) {
+    throw new Error("YouTube API 키가 설정되지 않았습니다. [설정] 메뉴에서 API 키를 입력해주세요.");
+  }
 
-  // For YouTube API: 'short' is < 4m, 'long' is > 20m
   const durationParam = videoType === 'any' ? '' : `&videoDuration=${videoType}`;
 
   try {
@@ -23,7 +28,7 @@ export const searchVideos = async (
     
     if (searchData.error) {
       if (searchData.error.code === 400 || searchData.error.code === 401) {
-        throw new Error("유효하지 않은 YouTube API 키입니다.");
+        throw new Error("유효하지 않은 YouTube API 키입니다. 다시 확인해주세요.");
       }
       throw new Error(searchData.error.message);
     }
@@ -34,13 +39,11 @@ export const searchVideos = async (
     const videoIds = items.map((item: any) => item.id.videoId).join(',');
     const channelIds = [...new Set(items.map((item: any) => item.snippet.channelId))].join(',');
 
-    // Fetch Video Stats
     const statsRes = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=statistics&id=${videoIds}&key=${apiKey}`
     );
     const statsData = await statsRes.json();
 
-    // Fetch Channel Stats
     const channelRes = await fetch(
       `https://www.googleapis.com/youtube/v3/channels?part=statistics&id=${channelIds}&key=${apiKey}`
     );
@@ -83,9 +86,10 @@ export const searchVideos = async (
 
 export const getVideoComments = async (videoId: string): Promise<CommentData[]> => {
   const apiKey = getYouTubeApiKey();
+  if (!apiKey) return [];
   try {
     const res = await fetch(
-      `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=50&order=relevance&key=${apiKey}`
+      `https://www.googleapis.com/commentThreads?part=snippet&videoId=${videoId}&maxResults=50&order=relevance&key=${apiKey}`
     );
     const data = await res.json();
     if (data.error) return [];

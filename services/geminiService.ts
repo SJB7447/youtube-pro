@@ -1,112 +1,266 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { AnalysisResult, CommentData, ScriptOutline, ProductionPlan, GeneratedAsset } from "../types";
+import { AnalysisResult, ScriptOutline, ProductionPlan, AIConcept } from "../types";
 
 export const getGeminiApiKey = () => {
   return process.env.API_KEY || '';
 };
 
-export const analyzeContent = async (
-  videoTitle: string,
-  comments: CommentData[]
-): Promise<AnalysisResult> => {
+export const generateConceptAngles = async (topic: string, language: string = "Korean"): Promise<AIConcept[]> => {
   const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
-  const commentText = comments.map(c => `- ${c.text}`).join('\n');
+  const prompt = `You are a viral YouTube content strategist. The user wants to make a video about "${topic}".
+  Generate 4 unique creative angles for this video targeted at the ${language} speaking market.
   
-  const prompt = `You are a professional YouTube growth strategist. 
-  Analyze the comments for the video "${videoTitle}" to find new content ideas.
+  IMPORTANT: 
+  1. "title" and "description" MUST be in ${language}.
+  2. "koreanTitle" and "koreanDescription" MUST be in Korean (translated version for the user).
+  3. Respond as JSON in the following format:
   
-  Comments:
-  ${commentText}
-  
-  Output the following in Korean as JSON:
-  1. audienceReaction: A concise summary of how people responded to the video.
-  2. frequentKeywords: Top 5 most mentioned keywords in comments.
-  3. recommendedTopics: 5 specific keywords/short-phrases for new video topics based on audience interest or gaps in current content, with a short 'reason' for each.`;
-
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            audienceReaction: { type: Type.STRING },
-            frequentKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
-            recommendedTopics: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  keyword: { type: Type.STRING },
-                  reason: { type: Type.STRING }
-                },
-                required: ["keyword", "reason"]
-              }
-            }
-          },
-          required: ["audienceReaction", "frequentKeywords", "recommendedTopics"]
-        }
+  {
+    "concepts": [
+      {
+        "id": "unique-id",
+        "title": "Title in ${language}",
+        "description": "Description in ${language}",
+        "koreanTitle": "한국어 제목 번역",
+        "koreanDescription": "한국어 내용 번역",
+        "style": "Visual style in ${language}",
+        "targetAudience": "Target audience in ${language}",
+        "estimatedVirality": 85
       }
-    });
+    ]
+  }`;
 
-    return JSON.parse(response.text || '{}');
-  } catch (error: any) {
-    console.error("Gemini Analysis Error:", error);
-    throw error;
-  }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          concepts: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                id: { type: Type.STRING },
+                title: { type: Type.STRING },
+                description: { type: Type.STRING },
+                koreanTitle: { type: Type.STRING },
+                koreanDescription: { type: Type.STRING },
+                style: { type: Type.STRING },
+                targetAudience: { type: Type.STRING },
+                estimatedVirality: { type: Type.NUMBER }
+              },
+              required: ["id", "title", "description", "koreanTitle", "koreanDescription", "style", "targetAudience", "estimatedVirality"]
+            }
+          }
+        },
+        required: ["concepts"]
+      }
+    }
+  });
+
+  const data = JSON.parse(response.text || '{"concepts":[]}');
+  return data.concepts;
 };
 
-export const generateScriptOutline = async (
-  keyword: string,
-  videoTitle: string
-): Promise<ScriptOutline> => {
+export const analyzeConceptBrief = async (concept: AIConcept): Promise<AnalysisResult> => {
   const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
-  const prompt = `Based on the trending keyword "${keyword}" from the video "${videoTitle}", create a YouTube script outline (Table of Contents). Respond in Korean as JSON.`;
+  const prompt = `Analyze this video concept: "${concept.title}" - ${concept.description}.
+  1. Predict how an audience would react.
+  2. Provide 5 sub-topics/keywords.
+  3. Provide SEO strategy for TWO cases: "short" (Shorts/TikTok) and "long" (Standard YouTube).
+  4. Each case needs SEO data for both YouTube and TikTok platforms.
+  Short SEO: Focus on hooks and trends. Long SEO: Focus on search intent and authority.
+  Respond in the same language as the concept title as JSON.`;
 
-  try {
-    const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            sections: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  label: { type: Type.STRING },
-                  content: { type: Type.STRING }
-                },
-                required: ["label", "content"]
-              }
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          audienceReaction: { type: Type.STRING },
+          frequentKeywords: { type: Type.ARRAY, items: { type: Type.STRING } },
+          recommendedTopics: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                keyword: { type: Type.STRING },
+                reason: { type: Type.STRING }
+              },
+              required: ["keyword", "reason"]
             }
           },
-          required: ["title", "sections"]
-        }
+          seoData: {
+            type: Type.OBJECT,
+            properties: {
+              short: {
+                type: Type.OBJECT,
+                properties: {
+                  youtube: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } } },
+                  tiktok: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } } }
+                }
+              },
+              long: {
+                type: Type.OBJECT,
+                properties: {
+                  youtube: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } } },
+                  tiktok: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } } }
+                }
+              }
+            },
+            required: ["short", "long"]
+          }
+        },
+        required: ["audienceReaction", "frequentKeywords", "recommendedTopics", "seoData"]
       }
-    });
+    }
+  });
 
-    return JSON.parse(response.text || '{}');
-  } catch (error: any) {
-    console.error("Gemini Outline Error:", error);
-    throw error;
-  }
+  return JSON.parse(response.text || '{}');
+};
+
+export const generateSeoStrategy = async (title: string, reaction: string, language: string): Promise<AnalysisResult['seoData']> => {
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+  const prompt = `Based on video title: "${title}" and audience insight: "${reaction}", generate a viral SEO strategy in ${language}.
+  Provide SEO data for TWO cases: "short" (Shorts/TikTok) and "long" (Standard YouTube).
+  Each case needs SEO data for both YouTube and TikTok platforms.
+  Respond as JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          short: {
+            type: Type.OBJECT,
+            properties: {
+              youtube: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } } },
+              tiktok: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } } }
+            }
+          },
+          long: {
+            type: Type.OBJECT,
+            properties: {
+              youtube: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, description: { type: Type.STRING }, tags: { type: Type.ARRAY, items: { type: Type.STRING } } } },
+              tiktok: { type: Type.OBJECT, properties: { title: { type: Type.STRING }, caption: { type: Type.STRING }, hashtags: { type: Type.ARRAY, items: { type: Type.STRING } } } }
+            }
+          }
+        },
+        required: ["short", "long"]
+      }
+    }
+  });
+
+  return JSON.parse(response.text || '{}');
+};
+
+export const regenerateSubTopics = async (conceptTitle: string, insight: string): Promise<AnalysisResult['recommendedTopics']> => {
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+  const prompt = `Based on this video concept: "${conceptTitle}" and strategic insight: "${insight}", provide 5 DIFFERENT and UNIQUE sub-topics/keywords for content creation. 
+  Respond in the same language as the concept title as JSON in the following format:
+  {
+    "recommendedTopics": [
+      { "keyword": "키워드", "reason": "이유" }
+    ]
+  }`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          recommendedTopics: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                keyword: { type: Type.STRING },
+                reason: { type: Type.STRING }
+              },
+              required: ["keyword", "reason"]
+            }
+          }
+        },
+        required: ["recommendedTopics"]
+      }
+    }
+  });
+
+  const data = JSON.parse(response.text || '{"recommendedTopics":[]}');
+  return data.recommendedTopics;
+};
+
+export const generateScriptOutline = async (topic: string): Promise<ScriptOutline> => {
+  const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+  const prompt = `Create a YouTube script outline for the topic: "${topic}". Respond in the same language as the topic as JSON.`;
+
+  const response = await ai.models.generateContent({
+    model: "gemini-3-flash-preview",
+    contents: prompt,
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          sections: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                label: { type: Type.STRING },
+                content: { type: Type.STRING }
+              },
+              required: ["label", "content"]
+            }
+          }
+        },
+        required: ["title", "sections"]
+      }
+    }
+  });
+
+  return JSON.parse(response.text || '{}');
 };
 
 export const generateProductionPlan = async (
-  outline: ScriptOutline,
-  isShorts: boolean
+  outline: ScriptOutline, 
+  isShorts: boolean, 
+  visualStyle: string, 
+  imageCount: number,
+  language: string = "Korean"
 ): Promise<ProductionPlan> => {
   const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
-  const imgCountRange = isShorts ? "6 to 8" : "12 to 25";
-  const prompt = `YouTube Video Title: ${outline.title}. Create a full spoken script in Korean and a series of ${imgCountRange} English image generation prompts visualizing the script. Output as JSON.`;
+  
+  const videoDuration = isShorts ? "20-40 seconds" : "180-270 seconds";
+
+  const prompt = `Video Title: ${outline.title}. 
+  Content Outline: ${JSON.stringify(outline.sections)}. 
+  Visual Style Theme: ${visualStyle}.
+  Target Language: ${language}.
+  Task: 
+  1. Write a full narrative script in ${language}. 
+     - IF SHORTS: Total spoken duration must be ${videoDuration}.
+     - IF LONG-FORM: Total spoken duration must be ${videoDuration}.
+  2. Create exactly ${imageCount} detailed visual scene descriptions (prompts) in English for AI image generation. 
+     - CRITICAL: DO NOT include any text, letters, signage, or words in the image prompts. The visuals must be purely cinematic/pictorial.
+  3. Provide a JSON list of subtitle segments for the script in ${language} following the SRT format structure. 
+     - Each segment must have 'index', 'start' (HH:MM:SS,mmm), 'end' (HH:MM:SS,mmm), and 'text'.
+  IMPORTANT: All image prompts MUST reflect the "${visualStyle}" aesthetic WITHOUT any text/typography.
+  Return as JSON.`;
 
   const response = await ai.models.generateContent({
     model: "gemini-3-pro-preview",
@@ -117,9 +271,25 @@ export const generateProductionPlan = async (
         type: Type.OBJECT,
         properties: {
           fullScript: { type: Type.STRING },
-          imagePrompts: { type: Type.ARRAY, items: { type: Type.STRING } }
+          imagePrompts: { 
+            type: Type.ARRAY, 
+            items: { type: Type.STRING }
+          },
+          subtitles: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                index: { type: Type.INTEGER },
+                start: { type: Type.STRING },
+                end: { type: Type.STRING },
+                text: { type: Type.STRING }
+              },
+              required: ["index", "start", "end", "text"]
+            }
+          }
         },
-        required: ["fullScript", "imagePrompts"]
+        required: ["fullScript", "imagePrompts", "subtitles"]
       }
     }
   });
@@ -127,40 +297,41 @@ export const generateProductionPlan = async (
   return JSON.parse(response.text || '{}');
 };
 
-export const generateImage = async (prompt: string): Promise<string> => {
+export const generateImage = async (prompt: string, aspectRatio: string = "16:9"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-image-preview', // Upgrading for better reliability in production workflow
-      contents: { parts: [{ text: prompt }] },
-      config: { imageConfig: { aspectRatio: "16:9", imageSize: "1K" } },
-    });
+  const cleanPrompt = `High-quality production visual, ABSOLUTELY NO TEXT, NO LETTERS, NO NUMBERS, NO TYPOGRAPHY: ${prompt}`;
+  
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-pro-image-preview',
+    contents: { parts: [{ text: cleanPrompt }] },
+    config: { imageConfig: { aspectRatio: aspectRatio as any, imageSize: "1K" } },
+  });
 
-    if (!response.candidates?.[0]?.content?.parts) {
-      throw new Error("No parts in response");
+  for (const part of response.candidates[0].content.parts) {
+    if (part.inlineData) {
+      return `data:image/png;base64,${part.inlineData.data}`;
     }
-
-    for (const part of response.candidates[0].content.parts) {
-      if (part.inlineData) {
-        return `data:image/png;base64,${part.inlineData.data}`;
-      }
-    }
-    throw new Error("Image content missing in response");
-  } catch (error: any) {
-    console.error("Image Gen Error for prompt:", prompt, error);
-    throw error;
   }
+  throw new Error("Image gen failed");
 };
 
-export const generateTTS = async (text: string): Promise<string> => {
+export const generateTTS = async (text: string, language: string = "Korean"): Promise<string> => {
   const ai = new GoogleGenAI({ apiKey: getGeminiApiKey() });
+  
+  // Voice mapping based on language
+  let voiceName = 'Kore'; // Default Korean
+  if (language === "English") voiceName = 'Zephyr';
+  if (language === "Japanese") voiceName = 'Puck';
+  if (language === "Spanish") voiceName = 'Charon';
+  if (language === "Chinese") voiceName = 'Fenrir';
+
   const response = await ai.models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `읽어주세요: ${text}` }] }],
+    contents: [{ parts: [{ text: text }] }],
     config: {
       responseModalities: [Modality.AUDIO],
       speechConfig: {
-        voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
+        voiceConfig: { prebuiltVoiceConfig: { voiceName } },
       },
     },
   });
@@ -170,25 +341,35 @@ export const generateTTS = async (text: string): Promise<string> => {
   return `data:audio/pcm;base64,${base64Audio}`;
 };
 
-export const generateVeoVideo = async (prompt: string): Promise<string> => {
+export const generateVeoVideo = async (prompt: string, startImageBase64: string, aspectRatio: string = "16:9"): Promise<string> => {
   const apiKey = getGeminiApiKey();
   const ai = new GoogleGenAI({ apiKey });
   
-  let operation = await ai.models.generateVideos({
+  const veoAspectRatio = (aspectRatio === "9:16" || aspectRatio === "16:9") ? aspectRatio : (aspectRatio === "3:4" || aspectRatio === "1:1" ? "9:16" : "16:9");
+
+  const config: any = { 
+    numberOfVideos: 1, 
+    resolution: '720p', 
+    aspectRatio: veoAspectRatio
+  };
+
+  const operation = await ai.models.generateVideos({
     model: 'veo-3.1-fast-generate-preview',
-    prompt: `Cinematic high quality 4k trailer: ${prompt}`,
-    config: { numberOfVideos: 1, resolution: '720p', aspectRatio: '16:9' }
+    prompt: `Cinematic motion, NO TEXT: ${prompt}`,
+    image: {
+      imageBytes: startImageBase64.split(',')[1],
+      mimeType: 'image/png'
+    },
+    config
   });
 
-  while (!operation.done) {
-    await new Promise(resolve => setTimeout(resolve, 10000));
-    operation = await ai.operations.getVideosOperation({operation: operation});
+  let result = operation;
+  while (!result.done) {
+    await new Promise(resolve => setTimeout(resolve, 8000));
+    result = await ai.operations.getVideosOperation({operation: result});
   }
 
-  const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
-  if (!downloadLink) throw new Error("Video download link missing");
-
-  // Fetch actual video bytes to bypass cross-origin / key issues in UI
+  const downloadLink = result.response?.generatedVideos?.[0]?.video?.uri;
   const videoResponse = await fetch(`${downloadLink}&key=${apiKey}`);
   const blob = await videoResponse.blob();
   return URL.createObjectURL(blob);
@@ -201,7 +382,6 @@ export const decodePCM = async (base64: string): Promise<AudioBuffer> => {
   for (let i = 0; i < binaryString.length; i++) {
     bytes[i] = binaryString.charCodeAt(i);
   }
-  
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)({sampleRate: 24000});
   const dataInt16 = new Int16Array(bytes.buffer);
   const buffer = ctx.createBuffer(1, dataInt16.length, 24000);
